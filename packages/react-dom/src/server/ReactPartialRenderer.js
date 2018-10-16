@@ -46,6 +46,7 @@ import {
   createMarkupForRoot,
 } from './DOMMarkupOperations';
 import escapeTextForBrowser from './escapeTextForBrowser';
+import { Dispatcher } from './ReactPartialRendererDispatcher';
 import {
   Namespaces,
   getIntrinsicNamespace,
@@ -67,6 +68,8 @@ type ReactNode = string | number | ReactElement;
 type FlatReactChildren = Array<null | ReactNode>;
 type toArrayType = (children: mixed) => FlatReactChildren;
 const toArray = ((React.Children.toArray: any): toArrayType);
+
+const ReactCurrentOwner = ReactSharedInternals.ReactCurrentOwner;
 
 // This is only used in DEV.
 // Each entry is `this.stack` from a currently executing renderer instance.
@@ -169,6 +172,7 @@ const didWarnAboutBadClass = {};
 const didWarnAboutDeprecatedWillMount = {};
 const didWarnAboutUndefinedDerivedState = {};
 const didWarnAboutUninitializedState = {};
+const didWarnAboutInvalidateContextType = {};
 const valuePropNames = ['value', 'defaultValue'];
 const newlineEatingTags = {
   listing: true,
@@ -346,13 +350,34 @@ function checkContextTypes(typeSpecs, values, location: string) {
 }
 
 function processContext(type, context) {
-  const maskedContext = maskContext(type, context);
-  if (__DEV__) {
-    if (type.contextTypes) {
-      checkContextTypes(type.contextTypes, maskedContext, 'context');
+  const contextType = type.contextType;
+  if (typeof contextType === 'object' && contextType !== null) {
+    if (__DEV__) {
+      if (
+        typeof contextType.unstable_read !== 'function' &&
+        !didWarnAboutInvalidateContextType[type]
+      ) {
+        didWarnAboutInvalidateContextType[type];
+        warningWithoutStack(
+          false,
+          '%s defines an invalid contextType. ' +
+            'contextType should point to the Context object returned by React.createContext(). ' +
+            'Did you accidentally pass the Context.Provider instead?',
+          getComponentName(type) || 'Component',
+        );
+      }
+    }
+
+    context = (contextType: any).unstable_read();
+  } else {
+    const context = maskContext(type, context);
+    if (__DEV__) {
+      if (type.contextTypes) {
+        checkContextTypes(type.contextTypes, context, 'context');
+      }
     }
   }
-  return maskedContext;
+  return context;
 }
 
 const hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -786,6 +811,8 @@ class ReactDOMServerRenderer {
       return null;
     }
 
+    ReactCurrentOwner.currentDispatcher = Dispatcher;
+
     let out = '';
     while (out.length < bytes) {
       if (this.stack.length === 0) {
@@ -828,6 +855,9 @@ class ReactDOMServerRenderer {
         out += this.render(child, frame.context, frame.domNamespace);
       }
     }
+
+    ReactCurrentOwner.currentDispatcher = null;
+
     return out;
   }
 
