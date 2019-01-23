@@ -53,38 +53,41 @@ describe('ReactDOMServerSuspense', () => {
 
   it('should render the children when no promise is thrown', async () => {
     const e = await serverRender(
-      <React.Suspense fallback={<Text text="Fallback" />}>
-        <Text text="Children" />
-      </React.Suspense>,
+      <div>
+        <React.Suspense fallback={<Text text="Fallback" />}>
+          <Text text="Children" />
+        </React.Suspense>,
+      </div>,
     );
-
-    expect(e.tagName).toBe('DIV');
-    expect(e.textContent).toBe('Children');
+    expect(e.getElementsByTagName('div').length).toBe(1);
+    expect(e.getElementsByTagName('div')[0].textContent).toBe('Children');
   });
 
   it('should render the fallback when a promise thrown', async () => {
     const e = await serverRender(
-      <React.Suspense fallback={<Text text="Fallback" />}>
-        <AsyncText text="Children" />
-      </React.Suspense>,
+      <div>
+        <React.Suspense fallback={<Text text="Fallback" />}>
+          <AsyncText text="Children" />
+        </React.Suspense>,
+      </div>,
     );
-
-    expect(e.tagName).toBe('DIV');
-    expect(e.textContent).toBe('Fallback');
+    expect(e.getElementsByTagName('div').length).toBe(1);
+    expect(e.getElementsByTagName('div')[0].textContent).toBe('Fallback');
   });
 
   it('should work with nested suspense components', async () => {
     const e = await serverRender(
-      <React.Suspense fallback={<Text text="Fallback" />}>
-        <div>
+      <div>
+        <React.Suspense fallback={<Text text="Fallback" />}>
           <Text text="Children" />
           <React.Suspense fallback={<Text text="Fallback" />}>
             <AsyncText text="Children" />
           </React.Suspense>
-        </div>
-      </React.Suspense>,
+        </React.Suspense>,
+      </div>,
     );
-
-    expect(e.innerHTML).toBe('<div>Children</div><div>Fallback</div>');
+    expect(e.getElementsByTagName('div').length).toBe(2);
+    expect(e.getElementsByTagName('div')[0].textContent).toBe('Children');
+    expect(e.getElementsByTagName('div')[1].textContent).toBe('Fallback');
   });
 });

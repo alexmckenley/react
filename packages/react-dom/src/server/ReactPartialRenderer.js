@@ -75,6 +75,8 @@ import {validateProperties as validateARIAProperties} from '../shared/ReactDOMIn
 import {validateProperties as validateInputProperties} from '../shared/ReactDOMNullInputValuePropHook';
 import {validateProperties as validateUnknownProperties} from '../shared/ReactDOMUnknownPropertyHook';
 
+const REACT_SUSPENSE_FALLBACK_TYPE = Symbol('suspense_fallback');
+
 // Based on reading the React.Children implementation. TODO: type this somewhere?
 type ReactNode = string | number | ReactElement;
 type FlatReactChildren = Array<null | ReactNode>;
@@ -831,11 +833,22 @@ class ReactDOMServerRenderer {
                 'suspense fallback not found, something is broken',
               );
               this.stack.push(fallbackFrame);
+              out[this.suspenseDepth] += `<!-- SUSPENSE_FALLBACK_BEGIN:${
+                this.suspenseDepth
+              } -->`;
               // Skip flushing output since we're switching to the fallback
               continue;
             } else {
-              out[this.suspenseDepth] += buffered;
+              out[this.suspenseDepth] +=
+                `<!-- SUSPENSE_BEGIN:${this.suspenseDepth} -->` +
+                buffered +
+                `<!-- SUSPENSE_END:${this.suspenseDepth} -->`;
             }
+          } else if (frame.type === REACT_SUSPENSE_FALLBACK_TYPE) {
+            out[this.suspenseDepth] +=
+              footer + `<!-- SUSPENSE_FALLBACK_END:${this.suspenseDepth} -->`;
+            // Skip flushing output since we've just flushed it above
+            continue;
           }
 
           // Flush output
@@ -969,13 +982,12 @@ class ReactDOMServerRenderer {
               ((nextChild: any): ReactElement).props.children,
             );
             const fallbackFrame: Frame = {
-              type: null,
+              type: REACT_SUSPENSE_FALLBACK_TYPE,
               domNamespace: parentNamespace,
               children: fallbackChildren,
               childIndex: 0,
               context: context,
               footer: '',
-              out: '',
             };
             const frame: Frame = {
               fallbackFrame,
